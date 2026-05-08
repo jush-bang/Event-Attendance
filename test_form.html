@@ -1,0 +1,49 @@
+
+<!DOCTYPE html>
+<html>
+<body>
+Testing form submission...
+<script>
+// Simulate adding a student and submitting the form
+async function testSubmit() {
+    const students = [
+        { name: 'John Doe', snumber: '2024001', section: 'A1', rfid: 'RF001' },
+        { name: 'Jane Smith', snumber: '2024002', section: 'A2', rfid: 'RF002' }
+    ];
+    
+    const formData = new FormData();
+    formData.append('_token', '{{ csrf_token() }}');
+    formData.append('event_title', 'Test Event');
+    formData.append('start_date', '2026-03-20');
+    formData.append('end_date', '2026-03-20');
+    formData.append('start_time', '09:00');
+    formData.append('end_time', '17:00');
+    formData.append('location', 'Main Hall');
+    
+    students.forEach((student, index) => {
+        formData.append(`students[${index}][name]`, student.name);
+        formData.append(`students[${index}][snumber]`, student.snumber);
+        formData.append(`students[${index}][section]`, student.section);
+        formData.append(`students[${index}][rfid]`, student.rfid);
+    });
+    
+    try {
+        const response = await fetch('http://127.0.0.1:8000/schedule-event', {
+            method: 'POST',
+            body: formData
+        });
+        console.log('Status:', response.status);
+        if (response.ok) {
+            console.log('Form submitted successfully!');
+        } else {
+            const text = await response.text();
+            console.log('Error:', text);
+        }
+    } catch (error) {
+        console.error('Error:', error);
+    }
+}
+testSubmit();
+</script>
+</body>
+</html>

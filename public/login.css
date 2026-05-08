@@ -1,0 +1,42 @@
+/* ================================
+   Login Page Custom Styles
+   ================================ */
+
+/* ---- General Page Styling ---- */
+body.login-page {
+  background: #f8f6f6;
+  font-family: 'Public Sans', sans-serif;
+}
+
+/* ---- Form Elements ---- */
+.login-page input::placeholder {
+  color: #cbd5e1;
+}
+
+.login-page input:focus {
+  outline: none;
+}
+
+/* ---- Animation & Transitions ---- */
+.login-page * {
+  transition: all 0.3s ease;
+}
+
+/* ---- Custom Scrollbar ---- */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: #f1f1f1;
+}
+
+::-webkit-scrollbar-thumb {
+  background: #cbd5e1;
+  border-radius: 10px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #94a3b8;
+}
