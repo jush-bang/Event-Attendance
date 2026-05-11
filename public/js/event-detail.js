@@ -830,6 +830,14 @@ function createDailyAttendanceRow(record) {
             const availableSessions = otherSessions.filter(s => s.status !== 'upcoming');
             if (availableSessions.length > 0) {
                 sessionFilter.value = availableSessions[0].id;
+            } else {
+                // All sessions are upcoming; add a placeholder and keep filter empty
+                const placeholder = document.createElement('option');
+                placeholder.value = '';
+                placeholder.textContent = 'No session started yet';
+                placeholder.disabled = true;
+                placeholder.selected = true;
+                sessionFilter.appendChild(placeholder);
             }
         }
 
@@ -973,6 +981,10 @@ function createDailyAttendanceRow(record) {
         }
     }
 
+    function getAttendeeSearchQuery() {
+        return document.getElementById('attendee-search')?.value.trim() || '';
+    }
+
     function attachViewBarcodeListeners() {
         document.querySelectorAll('.viewBarcodeBtn').forEach(button => {
             const newButton = button.cloneNode(true);
@@ -998,9 +1010,20 @@ function createDailyAttendanceRow(record) {
 
         if (!tableBody) return;
 
-        const response = await fetch(`/event/${eventId}/attendee-page?page=${page}`);
+        const searchQuery = getAttendeeSearchQuery();
+        const urlParams = new URLSearchParams({ page: String(page) });
+        if (searchQuery) {
+            urlParams.set('attendee_search', searchQuery);
+        }
+
+        setAttendeeListLoading(true);
+        disableAttendeePagination(true);
+
+        const response = await fetch(`/event/${eventId}/attendee-page?${urlParams.toString()}`);
         if (!response.ok) {
             console.error('Failed to load attendee page', response.statusText);
+            setAttendeeListLoading(false);
+            disableAttendeePagination(false);
             return;
         }
 
@@ -1036,11 +1059,37 @@ function createDailyAttendanceRow(record) {
 
         attachDeleteListeners();
         attachViewBarcodeListeners();
-        filterAttendeeList();
+        setAttendeeListLoading(false);
+        disableAttendeePagination(false);
     }
 
+    function setAttendeeListLoading(isLoading) {
+        const loadingEl = document.getElementById('attendee-search-loading');
+        if (!loadingEl) return;
+        loadingEl.classList.toggle('hidden', !isLoading);
+    }
+
+    function disableAttendeePagination(disabled) {
+        const prevButton = document.getElementById('attendee-page-prev');
+        const nextButton = document.getElementById('attendee-page-next');
+        [prevButton, nextButton].forEach(btn => {
+            if (!btn) return;
+            btn.classList.toggle('pointer-events-none', disabled);
+            btn.classList.toggle('opacity-50', disabled);
+            btn.disabled = disabled;
+        });
+    }
+
+    let attendeeSearchDebounceTimer = null;
+
     function filterAttendeeList() {
-        filterForAttendeeList();
+        if (attendeeSearchDebounceTimer) {
+            clearTimeout(attendeeSearchDebounceTimer);
+        }
+
+        attendeeSearchDebounceTimer = setTimeout(() => {
+            fetchAttendeePage(1);
+        }, 250);
     }
 
     async function addAttendeeToEvent() {
@@ -1134,21 +1183,38 @@ function createDailyAttendanceRow(record) {
         const sessionFilter = document.getElementById('daily-session-filter')?.value || '';
         
         // Check if selected session has started
-        if (sessionFilter) {
-            const currentDaySessions = sessionsData[currentDay] || [];
-            const selectedSession = currentDaySessions.find(s => String(s.id) === String(sessionFilter));
-            
-            const noSessionMessage = document.getElementById('no-session-started-message');
-            if (selectedSession && selectedSession.status === 'upcoming') {
-                if (noSessionMessage) {
-                    noSessionMessage.classList.remove('hidden');
-                }
-                // Hide all rows and hide pagination
-                document.querySelectorAll('.daily-attendance-row').forEach(row => row.classList.add('hidden'));
-                updateDailyPaginationControls(0, 0, 0);
-                return;
-            } else if (noSessionMessage) {
+        const currentDaySessions = sessionsData[currentDay] || [];
+        const selectedSession = currentDaySessions.find(s => String(s.id) === String(sessionFilter));
+        const noSessionMessage = document.getElementById('no-session-started-message');
+        const tableWrapper = document.getElementById('daily-attendance-table-wrapper');
+
+        const hasUpcomingOnly = currentDaySessions.length > 0 && currentDaySessions.every(s => s.status === 'upcoming');
+        if (!sessionFilter && hasUpcomingOnly) {
+            if (noSessionMessage) {
+                noSessionMessage.classList.remove('hidden');
+            }
+            if (tableWrapper) {
+                tableWrapper.classList.add('hidden');
+            }
+            updateDailyPaginationControls(0, 0, 0);
+            return;
+        }
+
+        if (selectedSession && selectedSession.status === 'upcoming') {
+            if (noSessionMessage) {
+                noSessionMessage.classList.remove('hidden');
+            }
+            if (tableWrapper) {
+                tableWrapper.classList.add('hidden');
+            }
+            updateDailyPaginationControls(0, 0, 0);
+            return;
+        } else {
+            if (noSessionMessage) {
                 noSessionMessage.classList.add('hidden');
+            }
+            if (tableWrapper) {
+                tableWrapper.classList.remove('hidden');
             }
         }
         

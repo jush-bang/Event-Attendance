@@ -22,6 +22,7 @@ document.addEventListener('DOMContentLoaded', function() {
     const SCAN_MODE_STORAGE_KEY = `scan_mode_${eventId}`;
     
     let currentScanMode = 'normal'; // SCAN MODE: normal, break, or timeout
+    let toastTimeout;
     
     const qrTabBtn = document.getElementById('qrTabBtn');
     const barcodeTabBtn = document.getElementById('barcodeTabBtn');
@@ -39,7 +40,9 @@ document.addEventListener('DOMContentLoaded', function() {
     const scannedCount = document.getElementById('scannedCount');
     const barcodeInput = document.getElementById('barcodeInput');
     const scanSessionFilter = document.getElementById('scan-session-filter');
+    const scanStatusFilter = document.getElementById('scan-status-filter');
     const scanSearch = document.getElementById('scan-search');
+    const scanToast = document.getElementById('scanToast');
 
     // ===== Load Session Manager Info =====
     async function loadSessionManagerInfo() {
@@ -325,6 +328,28 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     }
 
+    function getDerivedAttendanceStatus(record) {
+        if (!record) return 'absent';
+
+        // Use the last cycle in cycles_data to determine if student has timed out
+        if (record.cycles_data && Array.isArray(record.cycles_data) && record.cycles_data.length > 0) {
+            const lastCycle = record.cycles_data[record.cycles_data.length - 1];
+            if (lastCycle && lastCycle.time_out) {
+                return 'timed_out';
+            }
+        }
+
+        if (record.status === 'left_session') {
+            return 'left_session';
+        }
+
+        if (record.status === 'present') {
+            return 'present';
+        }
+
+        return 'absent';
+    }
+
     // Render attendance table
     function renderAttendanceTable() {
         const table = document.getElementById('attendance-table-body');
@@ -334,14 +359,22 @@ document.addEventListener('DOMContentLoaded', function() {
         updateColumnVisibility();
 
         const sessionId = scanSessionFilter?.value;
+        const statusFilter = scanStatusFilter?.value;
         const searchTerm = scanSearch?.value.toLowerCase() || '';
 
 
         let filtered = attendanceData;
 
         // Only filter by session if a session is selected and exists
-        if (sessionId) {
+        if (sessionId && sessionId !== 'all') {
             filtered = filtered.filter(a => a.session_id == sessionId);
+        }
+
+        // Filter by status if selected
+        if (statusFilter && statusFilter !== 'all') {
+            filtered = filtered.filter(a => {
+                return getDerivedAttendanceStatus(a) === statusFilter;
+            });
         }
 
         // Filter by search
@@ -371,10 +404,13 @@ document.addEventListener('DOMContentLoaded', function() {
         table.innerHTML = filtered.map(record => {
             // Status badge
             let statusBadge = '';
-            if (record.status === 'present') {
+            const derivedStatus = getDerivedAttendanceStatus(record);
+            if (derivedStatus === 'present') {
                 statusBadge = '<span class="px-3 py-1 bg-green-100 text-green-800 rounded-full text-xs font-semibold">Present</span>';
-            } else if (record.status === 'left_session') {
+            } else if (derivedStatus === 'left_session') {
                 statusBadge = '<span class="px-3 py-1 bg-yellow-100 text-yellow-800 rounded-full text-xs font-semibold">On Break</span>';
+            } else if (derivedStatus === 'timed_out') {
+                statusBadge = '<span class="px-3 py-1 bg-red-100 text-red-800 rounded-full text-xs font-semibold">Timed Out</span>';
             } else {
                 statusBadge = '<span class="px-3 py-1 bg-surface-container text-on-surface-variant rounded-full text-xs font-semibold">Absent</span>';
             }
@@ -1246,12 +1282,16 @@ document.addEventListener('DOMContentLoaded', function() {
 
     // Add scanned student to list
     function addScannedStudent(student) {
-        // Check if student already in list to avoid duplicates
-        if (!scannedStudents.some(s => s.snumber === student.snumber)) {
-            scannedStudents.push(student);
-            saveScannedStudentsToStorage();
-            renderScannedList();
+        const existingIndex = scannedStudents.findIndex(s => s.snumber === student.snumber);
+        if (existingIndex !== -1) {
+            // Move existing scan to the top when rescanned
+            const [existingStudent] = scannedStudents.splice(existingIndex, 1);
+            scannedStudents.unshift(existingStudent);
+        } else {
+            scannedStudents.unshift(student);
         }
+        saveScannedStudentsToStorage();
+        renderScannedList();
     }
 
     // Render scanned students list
@@ -1270,25 +1310,26 @@ document.addEventListener('DOMContentLoaded', function() {
         scannedList.innerHTML = scannedStudents.map((student, index) => {
             // Find the student's attendance record for the current session
             const sessionId = scanSessionFilter?.value;
-            const studentAttendance = attendanceData.find(a => 
-                a.student_id === student.snumber && a.session_id == sessionId
-            );
+            const studentAttendance = attendanceData.find(a => {
+                if (!sessionId || sessionId === 'all') {
+                    return a.student_id === student.snumber;
+                }
+                return a.student_id === student.snumber && a.session_id == sessionId;
+            });
             
-            // Determine badge based on student status and current scan mode
+            // Determine badge based on derived status
             let badge = '<span class="text-xs font-bold text-green-600 bg-green-100 px-2 py-1 rounded-full">✓ Present</span>';
             
             if (studentAttendance) {
-                if (studentAttendance.status === 'left_session') {
+                const derivedStatus = getDerivedAttendanceStatus(studentAttendance);
+                if (derivedStatus === 'left_session') {
                     badge = '<span class="text-xs font-bold text-yellow-600 bg-yellow-100 px-2 py-1 rounded-full">☕ On Break</span>';
-                } else if (studentAttendance.status === 'absent') {
-                    // Show timeout mode indicator if in timeout mode
-                    if (currentScanMode === 'timeout') {
-                        badge = '<span class="text-xs font-bold text-red-600 bg-red-100 px-2 py-1 rounded-full">⚡ 🚪 Timed Out</span>';
-                    } else {
-                        badge = '<span class="text-xs font-bold text-red-600 bg-red-100 px-2 py-1 rounded-full">✗ Timed Out</span>';
-                    }
-                } else if (studentAttendance.status === 'present') {
+                } else if (derivedStatus === 'timed_out') {
+                    badge = '<span class="text-xs font-bold text-red-600 bg-red-100 px-2 py-1 rounded-full">✗ Timed Out</span>';
+                } else if (derivedStatus === 'present') {
                     badge = '<span class="text-xs font-bold text-green-600 bg-green-100 px-2 py-1 rounded-full">✓ Present</span>';
+                } else {
+                    badge = '<span class="text-xs font-bold text-slate-600 bg-slate-100 px-2 py-1 rounded-full">Absent</span>';
                 }
             }
             
@@ -1311,11 +1352,47 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     }
 
+    // Show floating toast message
+    function showScanToast(message, type) {
+        if (!scanToast) return;
+
+        const background = type === 'success'
+            ? 'bg-green-600 text-white shadow-lg'
+            : type === 'error'
+            ? 'bg-red-600 text-white shadow-lg'
+            : type === 'warning'
+            ? 'bg-amber-500 text-slate-950 shadow-lg'
+            : 'bg-slate-900 text-white shadow-lg';
+
+        scanToast.innerHTML = `
+            <div class="pointer-events-auto flex items-center justify-between gap-3 rounded-2xl px-5 py-3 text-sm font-semibold ${background} border border-white/10 shadow-xl backdrop-blur-sm">
+                <span class="flex-1 text-left">${message}</span>
+                <button type="button" id="scanToastCloseBtn" class="ml-4 rounded-full bg-white/10 px-3 py-1 text-base font-bold text-current hover:bg-white/20">×</button>
+            </div>
+        `;
+
+        const closeBtn = scanToast.querySelector('#scanToastCloseBtn');
+        if (closeBtn) {
+            closeBtn.addEventListener('click', function() {
+                scanToast.style.opacity = '0';
+                setTimeout(() => {
+                    scanToast.classList.add('hidden');
+                    scanToast.classList.remove('flex');
+                }, 200);
+            });
+        }
+
+        scanToast.classList.remove('hidden');
+        scanToast.classList.add('flex');
+        scanToast.style.opacity = '1';
+    }
+
     // Show QR status message
     function showQRStatus(message, type) {
         qrScanStatus.classList.remove('hidden');
         qrStatusMessage.textContent = message;
         applyStatusStyling(qrScanStatus, type);
+        showScanToast(message, type);
     }
 
     // Show Barcode status message
@@ -1323,6 +1400,7 @@ document.addEventListener('DOMContentLoaded', function() {
         barcodeScanStatus.classList.remove('hidden');
         barcodeStatusMessage.textContent = message;
         applyStatusStyling(barcodeScanStatus, type);
+        showScanToast(message, type);
     }
 
     // Apply status styling
@@ -1532,6 +1610,9 @@ document.addEventListener('DOMContentLoaded', function() {
             hasActiveSession = allSessions.some(s => s.status === 'active');
             updateCameraButtonState();
         });
+    }
+    if (scanStatusFilter) {
+        scanStatusFilter.addEventListener('change', renderAttendanceTable);
     }
     if (scanSearch) {
         scanSearch.addEventListener('input', renderAttendanceTable);

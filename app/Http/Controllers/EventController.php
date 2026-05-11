@@ -252,7 +252,9 @@ class EventController extends Controller
         if ($searchTerm !== '') {
             $studentQuery->where(function ($query) use ($searchTerm) {
                 $query->where('name', 'like', "%{$searchTerm}%")
-                      ->orWhere('snumber', 'like', "%{$searchTerm}%");
+                      ->orWhere('snumber', 'like', "%{$searchTerm}%")
+                      ->orWhere('section', 'like', "%{$searchTerm}%")
+                      ->orWhere('program', 'like', "%{$searchTerm}%");
             });
         }
 

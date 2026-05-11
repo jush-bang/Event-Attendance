@@ -115,6 +115,7 @@
     </style>
 </head>
 <body class="bg-surface flex flex-col min-h-screen" data-event-id="<?php echo e($event->e_id); ?>" data-require-action-prompts="<?php echo e($event->require_action_prompts); ?>">
+    <div id="scanToast" class="fixed top-5 left-1/2 z-[9999] -translate-x-1/2 w-full max-w-xl px-4 pointer-events-none hidden opacity-0 transition-opacity duration-300"></div>
     <!-- ====== Universal Header ====== -->
     <?php if (isset($component)) { $__componentOriginalfd1f218809a441e923395fcbf03e4272 = $component; } ?>
 <?php if (isset($attributes)) { $__attributesOriginalfd1f218809a441e923395fcbf03e4272 = $attributes; } ?>
@@ -144,14 +145,14 @@
         <div class="w-full max-w-7xl px-8 py-8 space-y-5">
                 <!-- Event Header -->
                 <div class="bg-surface-container-lowest rounded-xl shadow-sm border border-outline-variant p-6">
-                    <div class="flex justify-between items-start mb-4">
+                    <div class="flex flex-col gap-4 sm:flex-row sm:justify-between sm:items-start mb-4">
                         <div>
                             <h1 class="text-2xl font-bold text-on-surface mb-2"><?php echo e($event->e_name); ?></h1>
                             <p class="text-on-surface-variant">Scan student barcodes or QR codes to mark attendance</p>
                         </div>
-                        <div id="managedBySection" class="flex items-center gap-2 bg-primary/10 px-4 py-3 rounded-lg">
+                        <div id="managedBySection" class="flex w-full max-w-xs items-center gap-2 bg-primary/10 px-4 py-3 rounded-lg sm:w-auto">
                             <span class="material-symbols-outlined text-base text-primary">person</span>
-                            <div class="text-right">
+                            <div class="text-left sm:text-right">
                                 <p class="text-xs text-on-surface-variant font-medium">Managed By</p>
                                 <p id="managerName" class="text-sm font-semibold text-primary"><?php echo e($event->user->name ?? 'No Session Started'); ?></p>
                                 <p id="managerEmail" class="text-xs text-on-surface-variant"><?php echo e($event->user->email ?? ''); ?></p>
@@ -296,11 +297,20 @@
                     </div>
                 </div>
 
-                <div class="flex gap-4 mb-6">
+                <div class="flex flex-col lg:flex-row gap-4 mb-6">
                     <div class="flex-1">
                         <label for="scan-session-filter" class="block text-sm font-semibold text-on-surface mb-2">Filter by Session</label>
                         <select id="scan-session-filter" class="w-full px-4 py-2 border border-outline-variant rounded-lg focus:outline-none focus:ring-2 focus:ring-primary/40 bg-surface-container-lowest text-on-surface">
-                            <option value="all">All Sessions</option>
+                        </select>
+                    </div>
+                    <div class="flex-1">
+                        <label for="scan-status-filter" class="block text-sm font-semibold text-on-surface mb-2">Filter by Status</label>
+                        <select id="scan-status-filter" class="w-full px-4 py-2 border border-outline-variant rounded-lg focus:outline-none focus:ring-2 focus:ring-primary/40 bg-surface-container-lowest text-on-surface">
+                            <option value="all">All Statuses</option>
+                            <option value="present">Present</option>
+                            <option value="left_session">On Break</option>
+                            <option value="absent">Absent</option>
+                            <option value="timed_out">Timed Out</option>
                         </select>
                     </div>
                     <div class="flex-1">

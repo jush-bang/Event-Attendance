@@ -208,7 +208,7 @@
                                     <div class="relative flex-grow w-full">
                                         <span class="material-symbols-outlined absolute left-4 top-1/2 -translate-y-1/2 text-on-surface-variant/50">search</span>
                                         <form method="GET" action="{{ route('event-detail', ['eventId' => $event->e_id]) }}">
-                                            <input id="attendee-search" name="attendee_search" value="{{ request('attendee_search') }}" class="w-full pl-12 pr-4 py-3 bg-surface-container-low border-none rounded-lg focus:ring-2 focus:ring-primary/20 text-sm" placeholder="Search by name or student ID..." type="text" />
+                                            <input id="attendee-search" name="attendee_search" value="{{ request('attendee_search') }}" class="w-full pl-12 pr-4 py-3 bg-surface-container-low border-none rounded-lg focus:ring-2 focus:ring-primary/20 text-sm" placeholder="Search by name, student ID, section, or program..." type="text" />
                                         </form>
                                     </div>
                                     <div class="flex gap-2 flex-shrink-0">
@@ -312,6 +312,13 @@
                                 <div class="bg-surface px-4 sm:px-6 py-3 sm:py-4 border-t border-surface-container-low flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between flex-shrink-0">
                                     <div class="space-y-1 text-sm text-on-surface-variant">
                                         <p id="attendee-pagination-info">Showing <strong>{{ $uniqueStudents->count() ? $uniqueStudents->firstItem() : 0 }}</strong> to <strong>{{ $uniqueStudents->count() ? $uniqueStudents->lastItem() : 0 }}</strong> of <strong>{{ $uniqueStudents->total() }}</strong> results</p>
+                                        <p id="attendee-search-loading" class="hidden text-sm text-on-surface-variant inline-flex items-center gap-2">
+                                            <svg class="w-4 h-4 animate-spin" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                                                <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                                                <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z"></path>
+                                            </svg>
+                                            Searching...
+                                        </p>
                                     </div>
                                     <div class="flex items-center gap-2 justify-start sm:justify-end">
                                         <a id="attendee-page-prev" href="{{ $uniqueStudents->appends(request()->query())->previousPageUrl() ?? '#' }}" data-current-page="{{ $uniqueStudents->currentPage() }}" data-last-page="{{ $uniqueStudents->lastPage() }}" class="px-4 py-2 bg-surface-container rounded-lg text-sm font-semibold text-on-surface-variant hover:bg-surface-container-high transition-colors {{ $uniqueStudents->onFirstPage() ? 'pointer-events-none opacity-50' : '' }}">
@@ -398,9 +405,10 @@
                                     <p class="text-on-warning-container text-sm">This session hasn't started yet. Please select an active session or wait for the session to begin.</p>
                                 </div>
                             </div>
-                            
-                            <div class="overflow-x-auto overflow-y-auto flex-grow border-b border-surface-container-low w-full max-w-full">
-                                <table class="w-full text-left daily-attendance-table" id="main-daily-table">
+
+                            <div id="daily-attendance-table-wrapper" class="flex-grow overflow-hidden flex flex-col">
+                                <div class="overflow-x-auto overflow-y-auto flex-grow border-b border-surface-container-low w-full max-w-full">
+                                    <table class="w-full text-left daily-attendance-table" id="main-daily-table">
                                     <thead class="sticky top-0 z-10">
                                     <tr class="border-b border-surface-container-low bg-surface-container-low">
                                         <th class="py-5 px-6 text-sm font-bold text-on-surface-variant uppercase tracking-wider">Full Name</th>
