@@ -1133,6 +1133,25 @@ function createDailyAttendanceRow(record) {
         const statusFilter = document.getElementById('daily-status-filter')?.value.toLowerCase() || '';
         const sessionFilter = document.getElementById('daily-session-filter')?.value || '';
         
+        // Check if selected session has started
+        if (sessionFilter) {
+            const currentDaySessions = sessionsData[currentDay] || [];
+            const selectedSession = currentDaySessions.find(s => String(s.id) === String(sessionFilter));
+            
+            const noSessionMessage = document.getElementById('no-session-started-message');
+            if (selectedSession && selectedSession.status === 'upcoming') {
+                if (noSessionMessage) {
+                    noSessionMessage.classList.remove('hidden');
+                }
+                // Hide all rows and hide pagination
+                document.querySelectorAll('.daily-attendance-row').forEach(row => row.classList.add('hidden'));
+                updateDailyPaginationControls(0, 0, 0);
+                return;
+            } else if (noSessionMessage) {
+                noSessionMessage.classList.add('hidden');
+            }
+        }
+        
         const rows = Array.from(document.querySelectorAll('.daily-attendance-row'));
         const matchingRows = [];
         
@@ -1151,6 +1170,7 @@ function createDailyAttendanceRow(record) {
             const isCurrentDay = String(rowDay) === String(currentDay);
             const matchesSearch = name.includes(searchQuery) || studentId.includes(searchQuery) || section.includes(searchQuery) || program.includes(searchQuery);
             const matchesStatus = !statusFilter || status === statusFilter;
+            // Ensure session filter is properly applied
             const matchesSession = !sessionFilter || String(rowSessionId) === String(sessionFilter);
             
             if (isCurrentDay && matchesSearch && matchesStatus && matchesSession) {

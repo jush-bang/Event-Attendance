@@ -391,6 +391,14 @@
 
                         <!-- Daily Attendance Table -->
                         <div class="flex-grow overflow-hidden flex flex-col">
+                            <!-- Session Not Started Message -->
+                            <div id="no-session-started-message" class="hidden flex items-center justify-center p-8 text-center">
+                                <div class="bg-warning-container rounded-lg p-6 max-w-md">
+                                    <p class="text-on-warning-container font-semibold text-lg mb-2">Session Not Started Yet</p>
+                                    <p class="text-on-warning-container text-sm">This session hasn't started yet. Please select an active session or wait for the session to begin.</p>
+                                </div>
+                            </div>
+                            
                             <div class="overflow-x-auto overflow-y-auto flex-grow border-b border-surface-container-low w-full max-w-full">
                                 <table class="w-full text-left daily-attendance-table" id="main-daily-table">
                                     <thead class="sticky top-0 z-10">

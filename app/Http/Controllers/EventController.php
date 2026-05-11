@@ -1313,6 +1313,7 @@ class EventController extends Controller
                         // Check if student exists, if not, prepare for creation
                         if (!in_array($studentNumber, $existingStudents)) {
                             $newStudents[] = [
+                                'e_id' => $eventId,
                                 'snumber' => $studentNumber,
                                 'name' => $studentData['student_name'],
                                 'section' => $studentData['section'],
