@@ -105,7 +105,10 @@
       <!-- Header Section -->
       <header class="mb-16">
         <div class="inline-block bg-secondary-fixed text-on-secondary-fixed px-3 py-1 rounded-lg text-xs font-bold uppercase tracking-widest mb-4">Administration Portal</div>
-        <h1 class="text-6xl font-black text-primary font-headline tracking-tighter leading-none mb-4">Welcome, Admin</h1>
+        @php
+          $welcomeRole = Auth::check() && Auth::user()->role === 'scanner' ? 'Scanner Personnel' : 'Admin';
+        @endphp
+        <h1 class="text-6xl font-black text-primary font-headline tracking-tighter leading-none mb-4">Welcome, {{ $welcomeRole }}</h1>
         <p class="text-on-surface-variant text-lg max-w-2xl leading-relaxed">Oversee campus engagement, manage institutional gatherings, and track student attendance with precision.</p>
       </header>
 

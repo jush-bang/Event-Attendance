@@ -160,44 +160,10 @@
                 </div>
               </div>
 
-              <!-- Times Grid -->
-              <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
-                <div class="space-y-2">
-                  <label class="block text-sm font-bold text-on-surface" for="start_time">Start Time</label>
-                  <input 
-                    class="w-full bg-surface-container-low border-none focus:ring-2 focus:ring-primary/40 rounded-xl px-5 py-4 text-sm" 
-                    id="start_time" 
-                    name="start_time"
-                    type="time"
-                    required
-                  />
-                </div>
-                <div class="space-y-2">
-                  <label class="block text-sm font-bold text-on-surface" for="end_time">End Time</label>
-                  <input 
-                    class="w-full bg-surface-container-low border-none focus:ring-2 focus:ring-primary/40 rounded-xl px-5 py-4 text-sm" 
-                    id="end_time" 
-                    name="end_time"
-                    type="time"
-                    required
-                  />
-                </div>
-              </div>
+              <!-- Session schedule is defined per session below -->
 
               <!-- Meta Grid -->
               <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
-                <div class="space-y-2">
-                  <label class="block text-sm font-bold text-on-surface" for="sessions">Number of Sessions</label>
-                  <input 
-                    class="w-full bg-surface-container-low border-none focus:ring-2 focus:ring-primary/40 rounded-xl px-5 py-4 text-sm" 
-                    id="sessions" 
-                    name="sessions"
-                    placeholder="1" 
-                    type="number"
-                    min="1"
-                    required
-                  />
-                </div>
                 <div class="space-y-2">
                   <label class="block text-sm font-bold text-on-surface" for="location">Room / Venue</label>
                   <input 
@@ -209,6 +175,11 @@
                     required
                   />
                 </div>
+              </div>
+
+              <!-- Day-by-Day Sessions Configuration -->
+              <div id="sessionsContainer" class="space-y-6">
+                <!-- Sessions for each day will be generated here -->
               </div>
 
               <!-- Checkbox Container -->
@@ -293,6 +264,144 @@
 
   <!-- JavaScript for functionality -->
   <script>
+    // Calculate number of days between two dates
+    function calculateDays(startDate, endDate) {
+      const start = new Date(startDate);
+      const end = new Date(endDate);
+      const diffTime = Math.abs(end - start);
+      const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24)) + 1;
+      return diffDays;
+    }
+
+    // Generate day-by-day session configuration inputs
+    function getExistingSessionValues() {
+      const values = {};
+      document.querySelectorAll('[data-day][data-session]').forEach(input => {
+        const day = input.dataset.day;
+        const session = input.dataset.session;
+        if (!values[day]) {
+          values[day] = {};
+        }
+        if (!values[day][session]) {
+          values[day][session] = { start: '', end: '' };
+        }
+
+        if (input.name.includes('day_session_start_time')) {
+          values[day][session].start = input.value;
+        }
+
+        if (input.name.includes('day_session_end_time')) {
+          values[day][session].end = input.value;
+        }
+      });
+      return values;
+    }
+
+    function generateSessionInputs() {
+      const startDate = document.getElementById('start_date').value;
+      const endDate = document.getElementById('end_date').value;
+      const container = document.getElementById('sessionsContainer');
+      const existingValues = getExistingSessionValues();
+
+      if (!startDate || !endDate) {
+        container.innerHTML = '';
+        return;
+      }
+
+      const numDays = calculateDays(startDate, endDate);
+      const start = new Date(startDate);
+      let html = '<div class="space-y-4">';
+      html += '<h3 class="text-lg font-bold text-on-surface">Sessions Per Day</h3>';
+
+      for (let i = 0; i < numDays; i++) {
+        const currentDay = new Date(start);
+        currentDay.setDate(currentDay.getDate() + i);
+        const dayName = currentDay.toLocaleDateString('en-US', { weekday: 'long', month: 'short', day: 'numeric' });
+        const dayNum = i + 1;
+        const existingCountInput = document.querySelector(`[name="day_sessions[${dayNum}]"]`);
+        const sessionCount = existingCountInput ? Math.max(1, parseInt(existingCountInput.value) || 1) : 1;
+
+        html += `
+          <div class="bg-surface-container-low/50 p-6 rounded-xl border border-outline-variant/20">
+            <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-4">
+              <div>
+                <h4 class="font-bold text-on-surface">Day ${dayNum} - ${dayName}</h4>
+                <p class="text-xs text-on-surface-variant">Define each session time separately</p>
+              </div>
+              <div class="w-full sm:w-40">
+                <label class="block text-sm font-bold text-on-surface" for="day_sessions_${dayNum}">Sessions</label>
+                <input
+                  id="day_sessions_${dayNum}"
+                  type="number"
+                  name="day_sessions[${dayNum}]"
+                  value="${sessionCount}"
+                  min="1"
+                  class="w-full bg-surface-container-low border-none focus:ring-2 focus:ring-primary/40 rounded-lg px-4 py-3 text-sm"
+                  data-day="${dayNum}"
+                />
+              </div>
+            </div>
+            <div class="space-y-4" id="day-${dayNum}-sessions">
+        `;
+
+        for (let session = 1; session <= sessionCount; session++) {
+          const stored = existingValues[dayNum] && existingValues[dayNum][session] ? existingValues[dayNum][session] : { start: '', end: '' };
+          html += `
+            <div class="bg-white border border-outline-variant/10 rounded-2xl p-4 shadow-sm">
+              <div class="flex items-center justify-between gap-4 mb-4">
+                <span class="font-semibold text-on-surface">Session ${session}</span>
+                <span class="text-xs uppercase tracking-[0.2em] text-on-surface-variant">Day ${dayNum}</span>
+              </div>
+              <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div class="space-y-2">
+                  <label class="block text-sm font-bold text-on-surface">Start Time</label>
+                  <input
+                    type="time"
+                    name="day_session_start_time[${dayNum}][${session}]"
+                    value="${stored.start}"
+                    required
+                    class="w-full bg-surface-container-low border-none focus:ring-2 focus:ring-primary/40 rounded-lg px-4 py-3 text-sm"
+                    data-day="${dayNum}"
+                    data-session="${session}"
+                  />
+                </div>
+                <div class="space-y-2">
+                  <label class="block text-sm font-bold text-on-surface">End Time</label>
+                  <input
+                    type="time"
+                    name="day_session_end_time[${dayNum}][${session}]"
+                    value="${stored.end}"
+                    required
+                    class="w-full bg-surface-container-low border-none focus:ring-2 focus:ring-primary/40 rounded-lg px-4 py-3 text-sm"
+                    data-day="${dayNum}"
+                    data-session="${session}"
+                  />
+                </div>
+              </div>
+            </div>
+          `;
+        }
+
+        html += '</div></div>';
+      }
+
+      html += '</div>';
+      container.innerHTML = html;
+
+      attachSessionInputListeners();
+    }
+
+    function attachSessionInputListeners() {
+      document.querySelectorAll('[name^="day_sessions"], [name^="day_session_start_time"], [name^="day_session_end_time"]').forEach(input => {
+        input.addEventListener('change', function() {
+          if (this.name.startsWith('day_sessions')) {
+            generateSessionInputs();
+          }
+          updateSummary();
+        });
+      });
+    }
+
     // Set minimum dates to today for date inputs
     function initializeDateValidation() {
       const today = new Date();
@@ -344,13 +453,42 @@
     // Update summary from form
     function updateSummary() {
       const startDate = document.getElementById('start_date').value;
-      const startTime = document.getElementById('start_time').value;
-      const endTime = document.getElementById('end_time').value;
       const location = document.getElementById('location').value;
+      const numDays = calculateDays(startDate, document.getElementById('end_date').value);
+      
+      let totalSessions = 0;
+      let daysInfo = [];
 
-      if (startDate && startTime) {
-        document.getElementById('summaryDate').textContent = `${startDate} ${startTime} - ${endTime}`;
+      for (let day = 1; day <= numDays; day++) {
+        const sessionsInput = document.querySelector(`[name="day_sessions[${day}]"]`);
+        if (!sessionsInput) {
+          continue;
+        }
+
+        const sessions = parseInt(sessionsInput.value) || 0;
+        totalSessions += sessions;
+
+        const sessionDetails = [];
+        for (let session = 1; session <= sessions; session++) {
+          const startTimeInput = document.querySelector(`[name="day_session_start_time[${day}][${session}]"]`);
+          const endTimeInput = document.querySelector(`[name="day_session_end_time[${day}][${session}]"]`);
+          if (startTimeInput && endTimeInput && startTimeInput.value && endTimeInput.value) {
+            sessionDetails.push(`${startTimeInput.value} - ${endTimeInput.value}`);
+          }
+        }
+
+        if (sessions > 0) {
+          const sessionText = sessionDetails.length > 0 ? sessionDetails.join(', ') : 'Times pending';
+          daysInfo.push(`Day ${day}: ${sessions} session${sessions > 1 ? 's' : ''} (${sessionText})`);
+        }
       }
+
+      if (startDate && totalSessions > 0) {
+        document.getElementById('summaryDate').textContent = daysInfo.length > 0 ? daysInfo.join(' | ') : `${totalSessions} total session${totalSessions > 1 ? 's' : ''}`;
+      } else {
+        document.getElementById('summaryDate').textContent = 'Pending Selection';
+      }
+      
       document.getElementById('summaryVenue').textContent = location || 'Not Specified';
     }
 
@@ -362,18 +500,21 @@
       document.getElementById('start_date').addEventListener('change', function() {
         validateStartDate();
         validateEndDate();
+        generateSessionInputs();
         updateSummary();
       });
       
       document.getElementById('end_date').addEventListener('change', function() {
         validateEndDate();
+        generateSessionInputs();
         updateSummary();
       });
-    });
+      
+      document.getElementById('location').addEventListener('change', updateSummary);
 
-    // Add event listeners for form inputs
-    ['start_time', 'end_time', 'location'].forEach(id => {
-      document.getElementById(id).addEventListener('change', updateSummary);
+      // Generate initial session layout on page load if dates are present
+      generateSessionInputs();
+      updateSummary();
     });
 
     // Form submission

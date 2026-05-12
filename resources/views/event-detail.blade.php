@@ -119,6 +119,12 @@
                         <h1 class="text-5xl md:text-6xl font-extrabold text-primary tracking-tight leading-tight mb-8">
                             {{ $event->e_name }}
                         </h1>
+                        @php
+                            $allSessionTimes = $event->sessions()->pluck('start_time')->filter();
+                            $allSessionEndTimes = $event->sessions()->pluck('end_time')->filter();
+                            $displayStartTime = $allSessionTimes->count() ? $allSessionTimes->sort()->first() : $event->start_time;
+                            $displayEndTime = $allSessionEndTimes->count() ? $allSessionEndTimes->sort()->last() : $event->end_time;
+                        @endphp
                         <div class="grid grid-cols-2 sm:grid-cols-4 gap-6">
                             <div class="flex flex-col gap-1">
                                 <span class="text-label-md text-on-surface-variant text-xs uppercase tracking-widest font-semibold">Date</span>
@@ -126,7 +132,7 @@
                             </div>
                             <div class="flex flex-col gap-1">
                                 <span class="text-label-md text-on-surface-variant text-xs uppercase tracking-widest font-semibold">Duration</span>
-                                <span class="text-on-surface font-medium">{{ \Carbon\Carbon::parse($event->start_time)->format('h:i A') }} - {{ \Carbon\Carbon::parse($event->end_time)->format('h:i A') }}</span>
+                                <span class="text-on-surface font-medium">{{ \Carbon\Carbon::parse($displayStartTime)->format('h:i A') }} - {{ \Carbon\Carbon::parse($displayEndTime)->format('h:i A') }}</span>
                             </div>
                             <div class="flex flex-col gap-1">
                                 <span class="text-label-md text-on-surface-variant text-xs uppercase tracking-widest font-semibold">Venue</span>
@@ -162,13 +168,25 @@
                                 $startDate = \Carbon\Carbon::parse($event->start_date);
                                 $endDate = \Carbon\Carbon::parse($event->end_date);
                                 $numDays = $startDate->diffInDays($endDate) + 1;
+                                $scheduleSessions = $event->sessions()->orderBy('day_number')->orderBy('session_number')->get()->groupBy('day_number');
                             @endphp
                             @for($i = 0; $i < $numDays; $i++)
-                                @php $dayDate = $startDate->clone()->addDays($i); @endphp
+                                @php
+                                    $dayDate = $startDate->clone()->addDays($i);
+                                    $daySessions = $scheduleSessions->get($i + 1, collect());
+                                    $dayStart = $daySessions->pluck('start_time')->filter()->sort()->first();
+                                    $dayEnd = $daySessions->pluck('end_time')->filter()->sort()->last();
+                                @endphp
                                 <div class="relative pl-8">
                                     <span class="absolute left-0 top-1 w-6 h-6 rounded-full bg-secondary-container ring-4 ring-primary"></span>
                                     <p class="text-sm font-semibold">Day {{ $i + 1 }}: {{ $dayDate->format('D, M d, Y') }}</p>
-                                    <p class="text-xs font-bold text-secondary-container opacity-90">{{ \Carbon\Carbon::parse($event->start_time)->format('h:i A') }} - {{ \Carbon\Carbon::parse($event->end_time)->format('h:i A') }}</p>
+                                    <p class="text-xs font-bold text-secondary-container opacity-90">
+                                        @if($dayStart && $dayEnd)
+                                            {{ \Carbon\Carbon::parse($dayStart)->format('h:i A') }} - {{ \Carbon\Carbon::parse($dayEnd)->format('h:i A') }}
+                                        @else
+                                            {{ \Carbon\Carbon::parse($event->start_time)->format('h:i A') }} - {{ \Carbon\Carbon::parse($event->end_time)->format('h:i A') }}
+                                        @endif
+                                    </p>
                                 </div>
                             @endfor
                         </div>
@@ -317,7 +335,7 @@
                                                 <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
                                                 <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z"></path>
                                             </svg>
-                                            Searching...
+                                            Loading...
                                         </p>
                                     </div>
                                     <div class="flex items-center gap-2 justify-start sm:justify-end">
@@ -465,7 +483,7 @@
                     Back to Events
                 </a>
                 <span class="text-slate-300">|</span>
-                <p class="text-xs font-medium text-slate-500">Â© 2024 STI College Balagtas. All rights reserved.</p>
+                <p class="text-xs font-medium text-slate-500">© 2024 STI College Balagtas. All rights reserved.</p>
             </div>
             <div class="flex items-center gap-4">
                 <button id="footerEventSessionBtn" class="px-6 py-2.5 bg-error text-on-error font-bold rounded-lg text-sm hover:brightness-95 transition-all shadow-lg shadow-error/10">
@@ -546,7 +564,7 @@
                             </div>
 
                             <p class="text-sm text-on-surface-variant mb-4">
-                                ðŸ“… {{ \Carbon\Carbon::parse($session->session_date)->format('M d, Y') }}
+                                 {{ \Carbon\Carbon::parse($session->session_date)->format('M d, Y') }}
                             </p>
 
                             <div class="space-y-3 mb-6 pt-6 border-t border-outline">
@@ -566,12 +584,12 @@
 
                             @if($session->start_time)
                                 <p class="text-xs text-on-surface-variant mb-2">
-                                    â±ï¸ Started: {{ \Carbon\Carbon::parse($session->start_time)->format('h:i A') }}
+                                     Started: {{ \Carbon\Carbon::parse($session->start_time)->format('h:i A') }}
                                 </p>
                             @endif
                             @if($session->end_time)
                                 <p class="text-xs text-on-surface-variant mb-4">
-                                    ðŸ Ended: {{ \Carbon\Carbon::parse($session->end_time)->format('h:i A') }}
+                                     Ended: {{ \Carbon\Carbon::parse($session->end_time)->format('h:i A') }}
                                 </p>
                             @endif
 
@@ -597,9 +615,9 @@
                         </div>
                     @empty
                         <div class="col-span-full text-center py-16">
-                            <p class="text-on-surface-variant text-lg mb-2">ðŸ“‹ No sessions yet</p>
+                            <p class="text-on-surface-variant text-lg mb-2">No sessions yet</p>
                             <p class="text-on-surface-variant text-sm">
-                                This event is configured for <strong>{{ $event->sessions }} session(s) per day</strong>
+                                This event is configured for <strong>{{ $event->sessions }} total session(s)</strong>
                             </p>
                         </div>
                     @endforelse

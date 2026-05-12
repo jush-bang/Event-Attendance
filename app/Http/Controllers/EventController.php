@@ -34,65 +34,117 @@ class EventController extends Controller
             'event_title' => 'required|string|max:255',
             'start_date' => 'required|date',
             'end_date' => 'required|date|after_or_equal:start_date',
-            'start_time' => 'required|date_format:H:i',
-            'end_time' => 'required|date_format:H:i',
-            'sessions' => 'required|integer|min:1',
             'location' => 'required|string|max:255',
+            'day_sessions' => 'required|array|min:1',
+            'day_sessions.*' => 'required|integer|min:1',
+            'day_session_start_time' => 'required|array|min:1',
+            'day_session_start_time.*' => 'required|array|min:1',
+            'day_session_start_time.*.*' => 'required|date_format:H:i',
+            'day_session_end_time' => 'required|array|min:1',
+            'day_session_end_time.*' => 'required|array|min:1',
+            'day_session_end_time.*.*' => 'required|date_format:H:i',
             'require_action_prompts' => 'nullable|boolean',
         ]);
 
         try {
-            // Debug logging
             Log::info('[DEBUG] Raw require_action_prompts input:', [
                 'input' => $request->input('require_action_prompts'),
                 'has' => $request->has('require_action_prompts'),
                 'bool' => (bool)$request->input('require_action_prompts'),
                 'equals_1' => $request->input('require_action_prompts') === '1',
             ]);
-            
-            // Create the event with explicit timestamps
-            $event = Event::create([
-                'e_name' => $validated['event_title'],
-                'start_date' => $validated['start_date'],
-                'end_date' => $validated['end_date'],
-                'start_time' => $validated['start_time'],
-                'end_time' => $validated['end_time'],
-                'sessions' => $validated['sessions'],
-                'e_location' => $validated['location'],
-                'require_action_prompts' => $request->input('require_action_prompts') === '1',
-                'e_status' => 'active',
-                'created_at' => now(),
-                'updated_at' => now(),
-            ]);
-            
-            Log::info('[DEBUG] Event created with require_action_prompts:', [
-                'value' => $event->require_action_prompts
-            ]);
 
-            // Auto-generate sessions for the event
+            $totalSessions = array_sum($validated['day_sessions']);
+            $requireActionPrompts = $request->input('require_action_prompts') === '1';
+
             $startDate = \Carbon\Carbon::parse($validated['start_date']);
             $endDate = \Carbon\Carbon::parse($validated['end_date']);
-            $sessionCount = (int)$validated['sessions'];
-            
-            // Calculate number of days
             $numDays = $startDate->diffInDays($endDate) + 1;
-            
-            // Create session records for each day and session
+
+            $minStartTime = null;
+            $maxEndTime = null;
+
             for ($day = 1; $day <= $numDays; $day++) {
+                $sessionCount = (int) ($validated['day_sessions'][$day] ?? 0);
+                if ($sessionCount <= 0) {
+                    continue;
+                }
+
                 $sessionDate = $startDate->clone()->addDays($day - 1);
-                
+
                 for ($session = 1; $session <= $sessionCount; $session++) {
-                    Session::create([
-                        'event_id' => $event->getKey(),
-                        'session_number' => $session,
-                        'day_number' => $day,
-                        'session_date' => $sessionDate->format('Y-m-d'),
-                        'status' => 'upcoming',
-                        'start_time' => null,
-                        'end_time' => null,
-                    ]);
+                    $startTimeString = $validated['day_session_start_time'][$day][$session] ?? null;
+                    $endTimeString = $validated['day_session_end_time'][$day][$session] ?? null;
+
+                    if (!$startTimeString || !$endTimeString) {
+                        throw new \Exception("Missing time for day {$day} session {$session}");
+                    }
+
+                    $sessionStartDateTime = \Carbon\Carbon::parse($sessionDate->format('Y-m-d') . ' ' . $startTimeString);
+                    $sessionEndDateTime = \Carbon\Carbon::parse($sessionDate->format('Y-m-d') . ' ' . $endTimeString);
+
+                    if ($minStartTime === null || $sessionStartDateTime->lt($minStartTime)) {
+                        $minStartTime = $sessionStartDateTime;
+                    }
+                    if ($maxEndTime === null || $sessionEndDateTime->gt($maxEndTime)) {
+                        $maxEndTime = $sessionEndDateTime;
+                    }
                 }
             }
+
+            if (!$minStartTime || !$maxEndTime) {
+                throw new \Exception('Session times are required for all sessions.');
+            }
+
+            $event = DB::transaction(function () use ($validated, $totalSessions, $requireActionPrompts, $startDate, $numDays, $minStartTime, $maxEndTime) {
+                $event = Event::create([
+                    'e_name' => $validated['event_title'],
+                    'start_date' => $validated['start_date'],
+                    'end_date' => $validated['end_date'],
+                    'start_time' => $minStartTime->format('H:i'),
+                    'end_time' => $maxEndTime->format('H:i'),
+                    'sessions' => $totalSessions,
+                    'e_location' => $validated['location'],
+                    'require_action_prompts' => $requireActionPrompts,
+                    'e_status' => 'active',
+                    'created_at' => now(),
+                    'updated_at' => now(),
+                ]);
+
+                for ($day = 1; $day <= $numDays; $day++) {
+                    $sessionCount = (int) ($validated['day_sessions'][$day] ?? 0);
+                    if ($sessionCount <= 0) {
+                        continue;
+                    }
+
+                    $sessionDate = $startDate->clone()->addDays($day - 1);
+
+                    for ($session = 1; $session <= $sessionCount; $session++) {
+                        $startTimeString = $validated['day_session_start_time'][$day][$session] ?? null;
+                        $endTimeString = $validated['day_session_end_time'][$day][$session] ?? null;
+
+                        $sessionStartTime = $startTimeString ? \Carbon\Carbon::parse($sessionDate->format('Y-m-d') . ' ' . $startTimeString) : null;
+                        $sessionEndTime = $endTimeString ? \Carbon\Carbon::parse($sessionDate->format('Y-m-d') . ' ' . $endTimeString) : null;
+
+                        Session::create([
+                            'event_id' => $event->getKey(),
+                            'session_number' => $session,
+                            'day_number' => $day,
+                            'session_date' => $sessionDate->format('Y-m-d'),
+                            'status' => 'upcoming',
+                            'start_time' => $sessionStartTime,
+                            'end_time' => $sessionEndTime,
+                        ]);
+                    }
+                }
+
+                return $event;
+            });
+
+            Log::info('[DEBUG] Event created with require_action_prompts:', [
+                'value' => $event->require_action_prompts,
+                'total_sessions' => $totalSessions,
+            ]);
 
             return redirect()->route('dashboard')->with('success', 'Event created successfully!');
         } catch (\Exception $e) {
